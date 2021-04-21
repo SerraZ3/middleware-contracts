@@ -1,0 +1,33 @@
+# Node modules
+node_modules/
+
+# Adonis directory for storing tmp files
+tmp/*
+!tmp/.gitkeep
+
+# Old files that can be usefull some time
+old/
+
+# Documentation folder
+docs/
+
+#production
+*.zip
+.github/
+
+# Environment variables, never commit this file
+.env
+
+
+# The development sqlite file
+database/*.sqlite
+database/
+
+package-lock.json
+yarn.lock
+yarn-error.log
+
+coverage
+
+# Config banco de dados
+ormconfig.json
