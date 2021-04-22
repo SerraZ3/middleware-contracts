@@ -9,6 +9,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE TYPE STORAGE_TYPE AS ENUM ('average', 'unit', 'by_size');
 
 CREATE TABLE IF NOT EXISTS users(
   id SERIAL PRIMARY KEY,
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS applications(
   auth VARCHAR(100) UNIQUE NOT NULL,
   user_id SERIAL NOT NULL,
   contract_id SERIAL NOT NULL,
+  contract_setting_id SERIAL NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), 
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 ); 
@@ -88,6 +90,16 @@ CREATE TABLE IF NOT EXISTS captures(
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), 
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 ); 
+CREATE TABLE IF NOT EXISTS contract_settings(
+  id SERIAL PRIMARY KEY,
+  data_size INTEGER NOT NULL default 10,
+  period VARCHAR(20) NOT NULL,
+  last_reading TIMESTAMPTZ,
+  next_reading TIMESTAMPTZ,
+  storage_type STORAGE_TYPE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), 
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+); 
 
 ALTER TABLE applications 
   ADD CONSTRAINT fk_applications_contracts
@@ -98,6 +110,11 @@ ALTER TABLE applications
   ADD CONSTRAINT fk_applications_users
   FOREIGN KEY (user_id) 
   REFERENCES users(id);
+
+ALTER TABLE applications 
+  ADD CONSTRAINT fk_applications_contract_settings
+  FOREIGN KEY (contract_setting_id) 
+  REFERENCES contract_settings(id);
 
 ALTER TABLE sensor_boxes 
   ADD CONSTRAINT fk_sensor_boxes_applications
