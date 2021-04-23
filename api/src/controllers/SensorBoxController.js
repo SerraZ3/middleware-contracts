@@ -119,17 +119,123 @@ class SensorBoxController {
         )
       );
       await DB.query("COMMIT");
-      DB.end();
+      await DB.end();
+
       return res.send("init");
     } catch (error) {
       console.log(error);
       await DB.query("ROLLBACK");
+      await DB.end();
 
       return res.status(400).send(error);
     }
   };
-  response = (req, res) => {
-    return res.send("response");
+  response = async (req, res) => {
+    try {
+      DB.connect();
+      await DB.query("BEGIN");
+      let {
+        ida,
+        idsb,
+        type,
+        timestamp: timestampRequest,
+
+        url,
+        sensors,
+      } = req.body;
+      ida = BigInt(ida);
+      idsb = BigInt(idsb);
+
+      let {
+        /*timestamp,*/
+        timestamp2Response,
+      } = DateProvider.validTimestamp(timestampRequest);
+
+      // Check if type message is w or write
+      if (type.toLowerCase() !== "w" && type.toLowerCase() !== "write") {
+        throw {
+          error: 1,
+          message: "Message init can't have type different of 'write' or 'w'",
+        };
+      }
+
+      let application = await DB.query(
+        "SELECT * FROM applications WHERE ida = $1",
+        [ida]
+      );
+      if (!application.rows[0]) throw { message: "Aplicação inválida (ida) " };
+
+      let sensorBox = await DB.query(
+        "SELECT * FROM sensor_boxes WHERE idsb = $1",
+        [idsb]
+      );
+      if (!sensorBox.rows[0]) throw { message: "Sensor box inválido (idsb) " };
+      sensorBox = sensorBox.rows[0];
+      // Mapping sensors
+      sensors = sensors.map((val, id) => {
+        // Check if data name is string
+        if (
+          typeof val.data.name === "string" ||
+          val.data.name instanceof String
+        ) {
+          // Check if data values is array
+          if (Array.isArray(val.data.measure)) {
+            // Remove spaces, accent, special character, put in lower case
+            val.data.name = StringProvider.formatString(val.data.name, {
+              all: true,
+            });
+
+            // Return formated data
+            return val.data;
+          }
+          throw {
+            error: 4,
+            message:
+              "Sensors error: " + val.data.name + " values isn't an array",
+          };
+        }
+
+        throw {
+          error: 5,
+          message: "Sensors error: Invalid name. " + (id + 1) + "º position",
+        };
+      });
+      console.log(sensors);
+      await Promise.all(
+        sensors.map(async (sensor) => {
+          let sensor_box_sensor = await DB.query(
+            `
+                SELECT sbs.id as id FROM sensor_boxes_sensors as sbs
+                JOIN sensors as s ON s.id = sbs.sensor_id
+                WHERE sensor_box_id = $1 
+                AND s.name LIKE $2
+              `,
+            [sensorBox.id, `%${sensor.name}%`]
+          );
+          if (!sensor_box_sensor.rows[0])
+            throw {
+              message: `${sensor.name} inválido`,
+            };
+          sensor_box_sensor = sensor_box_sensor.rows[0];
+
+          await DB.query(
+            `
+                INSERT INTO readings(value, sensor_box_sensor_id)
+                VALUES($1, $2) 
+              `,
+            [{ measures: sensor.measure }, sensor_box_sensor.id]
+          );
+        })
+      );
+      await DB.query("COMMIT");
+      await DB.end();
+      return res.status(201).send("response");
+    } catch (error) {
+      console.log(error);
+      await DB.query("ROLLBACK");
+      await DB.end();
+      return res.status(400).send(error);
+    }
   };
   trap = (req, res) => {
     return res.send("trap");
