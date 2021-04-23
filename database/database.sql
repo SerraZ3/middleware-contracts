@@ -75,8 +75,8 @@ CREATE TABLE IF NOT EXISTS contracts(
 ); 
 CREATE TABLE IF NOT EXISTS wallets(
   id SERIAL PRIMARY KEY,
-  address VARCHAR(100) NOT NULL UNIQUE,
-  crypto JSON NOT NULL,
+  keystorejsonV3 JSON NOT NULL,
+  user_id SERIAL NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), 
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 ); 
@@ -115,6 +115,11 @@ ALTER TABLE applications
   ADD CONSTRAINT fk_applications_contract_settings
   FOREIGN KEY (contract_setting_id) 
   REFERENCES contract_settings(id);
+
+ALTER TABLE wallets 
+  ADD CONSTRAINT fk_wallets_users
+  FOREIGN KEY (user_id) 
+  REFERENCES users(id);
 
 ALTER TABLE sensor_boxes 
   ADD CONSTRAINT fk_sensor_boxes_applications
