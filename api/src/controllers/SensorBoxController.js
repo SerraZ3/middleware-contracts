@@ -1,11 +1,16 @@
-const DB = require("../config/database");
+const { Pool } = require("pg");
+let dbConfig = require("../config/database");
+
 const DateProvider = require("../utils/DateProvider");
 const StringProvider = require("../utils/StringProvider");
+const walletProvider = require("../services/walletProvider");
+const { WALLET_PASSWORD } = process.env;
+const pool = new Pool(dbConfig);
 
 class SensorBoxController {
   init = async (req, res) => {
+    const DB = await pool.connect();
     try {
-      DB.connect();
       await DB.query("BEGIN");
       let {
         ida,
@@ -119,27 +124,26 @@ class SensorBoxController {
         )
       );
       await DB.query("COMMIT");
-      await DB.end();
 
       return res.send("init");
     } catch (error) {
       console.log(error);
       await DB.query("ROLLBACK");
-      await DB.end();
 
       return res.status(400).send(error);
+    } finally {
+      DB.release(true);
     }
   };
   response = async (req, res) => {
+    const DB = await pool.connect();
     try {
-      DB.connect();
       await DB.query("BEGIN");
       let {
         ida,
         idsb,
         type,
         timestamp: timestampRequest,
-
         url,
         sensors,
       } = req.body;
@@ -164,7 +168,16 @@ class SensorBoxController {
         [ida]
       );
       if (!application.rows[0]) throw { message: "Aplicação inválida (ida) " };
-
+      let userWallet = await DB.query(
+        "SELECT * FROM wallets WHERE user_id = $1 LIMIT 1",
+        [application.rows[0].user_id]
+      );
+      console.log();
+      userWallet = await walletProvider.decrypt(
+        userWallet.rows[0].keystorejsonv3,
+        WALLET_PASSWORD
+      );
+      console.log(userWallet);
       let sensorBox = await DB.query(
         "SELECT * FROM sensor_boxes WHERE idsb = $1",
         [idsb]
@@ -228,13 +241,15 @@ class SensorBoxController {
         })
       );
       await DB.query("COMMIT");
-      await DB.end();
+
       return res.status(201).send("response");
     } catch (error) {
       console.log(error);
       await DB.query("ROLLBACK");
-      await DB.end();
+
       return res.status(400).send(error);
+    } finally {
+      DB.release(true);
     }
   };
   trap = (req, res) => {

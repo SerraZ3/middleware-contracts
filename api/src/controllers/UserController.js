@@ -1,16 +1,20 @@
-const DB = require("../config/database");
+const { Pool } = require("pg");
+let dbConfig = require("../config/database");
 const Hash = require("../utils/HashProvider");
 const walletProvider = require("../services/walletProvider");
+const { WALLET_PASSWORD } = process.env;
 const { sign } = require("jsonwebtoken");
 const authConfig = require("../config/auth");
-const { WALLET_PASSWORD } = process.env;
+const pool = new Pool(dbConfig);
 
 class UserController {
   login = async (req, res) => {
     const { email, password } = req.body;
+
+    const DB = await pool.connect();
     try {
       if (!email || !password) throw { message: "Preencha os campos" };
-      DB.connect();
+
       const user = await DB.query("SELECT * FROM users WHERE email = $1", [
         email,
       ]);
@@ -27,21 +31,24 @@ class UserController {
         subject: `${user._id}`,
         expiresIn,
       });
-      DB.end();
+
       return res
         .status(200)
         .json({ message: "Logado com sucesso", token, user: user.rows[0] });
     } catch (error) {
       console.log(error);
       return res.status(400).send(error);
+    } finally {
+      DB.release(true);
     }
   };
   create = async (req, res) => {
     const { email, password } = req.body;
+    const DB = await pool.connect();
 
     try {
       if (!email || !password) throw { message: "Preencha os campos" };
-      DB.connect();
+
       await DB.query("BEGIN");
 
       const checkEmail = await DB.query(
@@ -68,7 +75,6 @@ class UserController {
       if (!newWallet.rows[0]) throw { message: "Erro na criação da carteira" };
 
       await DB.query("COMMIT");
-      DB.end();
 
       return res.status(200).send("Sucesso");
     } catch (error) {
@@ -76,6 +82,8 @@ class UserController {
 
       console.log(error);
       return res.status(400).send(error);
+    } finally {
+      DB.release(true);
     }
   };
 }
